@@ -1403,15 +1403,16 @@ abstract contract Ownable is Context {
 
 // File contracts/EvilWizards.sol
 
-//  
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 pragma solidity ^0.8.4;
-contract MettaProtocolReceipts is ERC721, ERC721Enumerable, Pausable, Ownable {
+contract MettaProtocolReceipts is ERC721, ERC721Enumerable, Pausable, Ownable, ReentrancyGuard {
     using Strings for uint256;
 
     string public baseURI =
         "https://gateway.ipfs.io/ipfs/QmaHzExqrP9EprMC82JkQzu8WtpCqrXv7cQ4isJqS23XRF/";
     string public baseExtension = ".json";
-    uint256 public cost = 0.01 ether;
+    uint256 public cost = 0.21 ether;
     uint256 public maxSupply = 10000;
     bool public revealed = true;
     bool private startSale = false;
@@ -1523,11 +1524,7 @@ contract MettaProtocolReceipts is ERC721, ERC721Enumerable, Pausable, Ownable {
         return totalSupply();
     }
 
-    function contractBalance() external view returns(uint256) {
-        return address(this).balance;
-    }
-
-    function mint(address _to, uint256 _mintAmount) public payable whenNotPaused {
+    function mint(address _to, uint256 _mintAmount) public payable nonReentrant whenNotPaused {
       uint256 supply = totalSupply();
       require(_mintAmount > 0);
       require(supply + _mintAmount <= maxSupply);

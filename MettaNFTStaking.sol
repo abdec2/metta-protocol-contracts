@@ -5,9 +5,9 @@ pragma solidity ^0.8.4 ;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./MettaReceipt.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-
-contract Metta_NFT_Staking is Ownable, IERC721Receiver {
+contract Metta_NFT_Staking is Ownable, IERC721Receiver, ReentrancyGuard {
     using SafeMath for uint256;
     IERC20 reward_token;
     MettaProtocolReceipts nft;
@@ -19,10 +19,10 @@ contract Metta_NFT_Staking is Ownable, IERC721Receiver {
     uint256 public mediumOpt = 60;
     uint256 public largeOpt = 90;
     uint256 public xlargeOpt = 120;
-    uint256 public smallReward = 1000;
-    uint256 public mediumReward = 2000;
-    uint256 public largeReward = 3000;
-    uint256 public xlargeReward = 4000;
+    uint256 public smallReward = 10;
+    uint256 public mediumReward = 20;
+    uint256 public largeReward = 30;
+    uint256 public xlargeReward = 40;
 
     struct Stake {
         uint24 tokenId; 
@@ -43,7 +43,7 @@ contract Metta_NFT_Staking is Ownable, IERC721Receiver {
         nft = _nft;
     }
 
-    function stake(uint256[] calldata tokenIds, period _stakingPeriod) external {
+    function stake(uint256[] calldata tokenIds, period _stakingPeriod) external nonReentrant {
         uint256 tokenId;
         totalStaked += tokenIds.length;
         for (uint i = 0; i < tokenIds.length; i++) {
@@ -51,19 +51,20 @@ contract Metta_NFT_Staking is Ownable, IERC721Receiver {
             require(nft.ownerOf(tokenId) == msg.sender, "not your token");
             require(vault[tokenId].tokenId == 0, 'already staked');
 
-            nft.transferFrom(msg.sender, address(this), tokenId);
-            emit NFTStaked(msg.sender, tokenId, block.timestamp);
-
             vault[tokenId] = Stake({
                 owner: msg.sender,
                 tokenId: uint24(tokenId),
                 timestamp: block.timestamp,
                 stakingPeriod: _stakingPeriod
             });
+
+            nft.transferFrom(msg.sender, address(this), tokenId);
+            emit NFTStaked(msg.sender, tokenId, block.timestamp);
+            
         }
     }
 
-    function _unstakeMany(uint256[] calldata tokenIds) external {
+    function _unstakeMany(uint256[] calldata tokenIds) external nonReentrant {
         uint256 tokenId;
         totalStaked -= tokenIds.length;
         uint256 earned = 0;
@@ -75,8 +76,8 @@ contract Metta_NFT_Staking is Ownable, IERC721Receiver {
                 earned += getPeriodReward(staked.stakingPeriod) * 10**9; // multiply rewards to token decimals
             }
             delete vault[tokenId];
-            emit NFTUnstaked(msg.sender, tokenId, block.timestamp);
             nft.transferFrom(address(this), msg.sender, tokenId);
+            emit NFTUnstaked(msg.sender, tokenId, block.timestamp);
         }
         if(earned > 0) {
             reward_token.transferFrom(owner(), msg.sender, earned);
@@ -86,8 +87,8 @@ contract Metta_NFT_Staking is Ownable, IERC721Receiver {
 
     function validateStakingPeriod(Stake memory staked) internal view returns(bool) {
         uint256 periodValue = getPeriodValue(staked.stakingPeriod);
-        //return block.timestamp >= (staked.timestamp + (86400 * periodValue)); // uncomment this on mainnet deployment
-        return block.timestamp >= (staked.timestamp + 300); // remove this on mainnet deployment
+        return block.timestamp >= (staked.timestamp + (86400 * periodValue)); // uncomment this on mainnet deployment
+        //return block.timestamp >= (staked.timestamp + 300); // remove this on mainnet deployment
     }
 
     function getPeriodValue(period _stPeriod) internal view returns(uint256) {
